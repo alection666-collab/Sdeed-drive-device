@@ -13,7 +13,7 @@ class Link {
     @Volatile var sent = 0L
     @Volatile var rttMs = -1f
     @Volatile var error: String? = null
-    @Volatile var value = 0.5f
+    @Volatile var value = 0f
 
     val running: Boolean get() = socket != null
 
@@ -21,10 +21,13 @@ class Link {
         stop()
         sent = 0; rttMs = -1f; error = null
         val s = DatagramSocket()
+        // Метка приоритета трафика (WMM): роутеры с поддержкой QoS отправляют такие пакеты вне очереди
+        try { s.trafficClass = 0xB8 } catch (_: Exception) {}
         socket = s
 
         thread(isDaemon = true, name = "sw-send") {
             try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
                 val addr = InetAddress.getByName(host)
                 val buf = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
                 var seq = 0
@@ -50,6 +53,7 @@ class Link {
         thread(isDaemon = true, name = "sw-recv") {
             val rb = ByteArray(64)
             try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
                 while (socket === s) {
                     val p = DatagramPacket(rb, rb.size)
                     s.receive(p)
